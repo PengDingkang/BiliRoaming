@@ -211,6 +211,11 @@
             android:title="@string/forbid_player_long_click_accelerate_title" />
 
         <SwitchPreference
+            android:key="disable_mini_player_auto_play_next"
+            android:summary="@string/disable_mini_player_auto_play_next_summary"
+            android:title="@string/disable_mini_player_auto_play_next_title" />
+
+        <SwitchPreference
             android:key="disable_live_room_double_click"
             android:summary="@string/disable_live_room_double_click_summary"
             android:title="@string/disable_live_room_double_click_title" />

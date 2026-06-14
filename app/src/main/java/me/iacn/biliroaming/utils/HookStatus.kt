@@ -75,6 +75,7 @@ object HookStatus {
         "SpeedHook" to setOf("default_speed"),
         "LongPressSpeed" to setOf("long_press_speed"),
         "PlayerLongPressHook" to setOf("forbid_player_long_click_accelerate"),
+        "MiniPlayerAutoStopHook" to setOf("disable_mini_player_auto_play_next"),
         "StoryPlayerAdHook" to setOf("purify_story_video_ad"),
     )
 
@@ -205,6 +206,11 @@ object HookStatus {
                     "getDefaultQn" in text ||
                     "selectQuality" in text ->
                 setOf("half_screen_quality", "full_screen_quality")
+
+            "DefaultMiniPlayerBizManager" in text ||
+                    "MiniPlayerAutoPlay" in text ||
+                    "mini.player" in text ->
+                setOf("disable_mini_player_auto_play_next")
 
             "vipQualityTrialService" in text || "canTrial" in text ->
                 setOf("disable_try_watch_vip_quality")
