@@ -10,6 +10,11 @@ import kotlinx.coroutines.launch
 import me.iacn.biliroaming.BuildConfig
 import me.iacn.biliroaming.XposedInit.Companion.moduleRes
 import me.iacn.biliroaming.utils.*
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.isDiagnosticsPage
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.replaceMediaHostInText
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.replaceMediaHostInUrl
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.selectedUposHost
+import me.iacn.biliroaming.utils.UposReplaceHelper.hostForLog
 
 
 class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
@@ -20,6 +25,18 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         @JavascriptInterface
         fun hook(url: String, text: String): String {
             return this@WebViewHook.hook(url, text)
+        }
+
+        @Suppress("UNUSED")
+        @JavascriptInterface
+        fun hookPage(pageUrl: String, url: String, text: String): String {
+            return this@WebViewHook.hook(pageUrl, url, text)
+        }
+
+        @Suppress("UNUSED")
+        @JavascriptInterface
+        fun hookRequest(pageUrl: String, url: String): String {
+            return this@WebViewHook.hookRequest(pageUrl, url)
         }
 
         @Suppress("UNUSED")
@@ -79,6 +96,28 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     @Suppress("UNUSED_PARAMETER")
     fun hook(url: String, text: String): String {
         return text
+    }
+
+    fun hook(pageUrl: String, url: String, text: String): String {
+        if (!isDiagnosticsPage(pageUrl)) return hook(url, text)
+        val target = selectedUposHost() ?: return text
+        val replaced = replaceMediaHostInText(text, target)
+        if (replaced != text) {
+            Log.d(
+                "official diagnostics CDN response ${url.hostForLog()} -> $target"
+            )
+        }
+        return replaced
+    }
+
+    fun hookRequest(pageUrl: String, url: String): String {
+        if (!isDiagnosticsPage(pageUrl)) return url
+        val target = selectedUposHost() ?: return url
+        return replaceMediaHostInUrl(url, target).also { replaced ->
+            if (replaced != url) {
+                Log.d("official diagnostics CDN request ${url.hostForLog()} -> $target")
+            }
+        }
     }
 
     override fun lateInitHook() {

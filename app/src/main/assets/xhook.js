@@ -2,6 +2,16 @@
 
 window.XMLHttpRequest.prototype.addEventListener = xhook.addEventListener;
 
+xhook.before(function(request) {
+    try {
+        request.url = hooker.hookRequest(location.href, request.url)
+    } catch(e) {}
+});
+
 xhook.after(function(request, response) {
-    response.text = hooker.hook(request.url, response.text)
+    try {
+        response.text = hooker.hookPage(location.href, request.url, response.text)
+    } catch(e) {
+        response.text = hooker.hook(request.url, response.text)
+    }
 });

@@ -9,6 +9,7 @@ import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -42,6 +43,7 @@ import me.iacn.biliroaming.BiliBiliPackage.Companion.instance
 import me.iacn.biliroaming.hook.JsonHook
 import me.iacn.biliroaming.hook.SplashHook
 import me.iacn.biliroaming.utils.*
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.markSession
 import me.iacn.biliroaming.utils.UposReplaceHelper.isLocatedCn
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -653,12 +655,27 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
         }
 
         private fun onOfficialVideoDiagnosticsClick(): Boolean {
+            markSession(prefs)
             val uri = Uri.parse(XposedInit.moduleRes.getString(R.string.official_video_diagnostics_url))
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                addCategory(Intent.CATEGORY_BROWSABLE)
+            val internalIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                setPackage(activity.packageName)
+                putExtra("url", uri.toString())
+            }
+            val explicitWebIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                component = ComponentName(activity.packageName, "tv.danmaku.bili.ui.webview.MWebActivity")
+                putExtra("url", uri.toString())
+            }
+            val browserUri = Uri.parse("bilibili://browser").buildUpon()
+                .appendQueryParameter("url", uri.toString())
+                .build()
+            val browserIntent = Intent(Intent.ACTION_VIEW, browserUri).apply {
+                setPackage(activity.packageName)
             }
             return try {
-                startActivity(intent)
+                runCatching { startActivity(internalIntent) }
+                    .recoverCatching { startActivity(explicitWebIntent) }
+                    .recoverCatching { startActivity(browserIntent) }
+                    .getOrThrow()
                 true
             } catch (_: ActivityNotFoundException) {
                 Toast.makeText(
