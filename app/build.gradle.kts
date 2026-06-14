@@ -12,7 +12,8 @@ plugins {
     alias(libs.plugins.lsplugin.cmaker)
 }
 
-val appVerCode = jgit.repo()?.commitCount("refs/remotes/origin/master") ?: 0
+val appVerCode = (findProperty("appVerCode") as String?)?.toIntOrNull()
+    ?: (jgit.repo()?.commitCount("refs/remotes/origin/master") ?: 0)
 val appVerName: String by rootProject
 
 rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->

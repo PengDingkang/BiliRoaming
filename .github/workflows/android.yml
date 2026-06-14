@@ -1,8 +1,9 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ master, mod ]
 
 jobs:
   build:
@@ -25,14 +26,16 @@ jobs:
           cache: 'gradle'
       - name: Retrieve version
         run: |
-          echo VERSION=$(echo ${{ github.event.head_commit.id }} | head -c 10) >> $GITHUB_ENV
+          SHORT_SHA="$(git rev-parse --short=10 HEAD)"
+          echo "VERSION=1.7.0-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ runner.os }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}
       - name: Write key
-        if: ${{ ( github.event_name != 'pull_request' && github.ref == 'refs/heads/master' ) || github.ref_type == 'tag' }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           if [ ! -z "${{ secrets.SIGNING_KEY }}" ]; then
             echo 'Writing sign key'
@@ -49,7 +52,7 @@ jobs:
           echo 'org.gradle.vfs.watch=true' >> gradle.properties
           echo 'org.gradle.jvmargs=-Xmx2048m' >> gradle.properties
           echo 'android.native.buildOutput=verbose' >> gradle.properties
-          ./gradlew -PappVerName=${{ env.VERSION }} assembleRelease assembleDebug
+          ./gradlew -PappVerName=${{ env.VERSION }} -PappVerCode=${{ env.VERSION_CODE }} assembleRelease assembleDebug
       - name: Upload built apk
         if: success()
         uses: actions/upload-artifact@v4
