@@ -100,29 +100,37 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         }
 
         if (hidden && removeCmdDms) {
-            instance.viewMossClass?.hookAfterMethod(
-                if (instance.useNewMossFunc) "executeViewProgress" else "viewProgress",
-                "com.bapis.bilibili.app.view.v1.ViewProgressReq"
-            ) { param ->
-                param.result?.callMethod("setVideoGuide", videoGuideClass?.new())
-            }
-            instance.viewUniteMossClass?.hookAfterMethod(
-                if (instance.useNewMossFunc) "executeViewProgress" else "viewProgress",
-                "com.bapis.bilibili.app.viewunite.v1.ViewProgressReq"
-            ) { param ->
-                param.result?.run {
-                    callMethod("clearDm")
-                    callMethod("getVideoGuide")?.callMethod("clearContractCard")
+            "com.bapis.bilibili.app.view.v1.ViewProgressReq".from(mClassLoader)?.let { reqClass ->
+                instance.viewMossClass?.hookAfterMethod(
+                    if (instance.useNewMossFunc) "executeViewProgress" else "viewProgress",
+                    reqClass
+                ) { param ->
+                    param.result?.callMethod("setVideoGuide", videoGuideClass?.new())
                 }
             }
-            instance.viewMossClass?.replaceMethod(
-                if (instance.useNewMossFunc) "executeTFInfo" else "tFInfo",
-                "com.bapis.bilibili.app.view.v1.TFInfoReq"
-            ) { null }
-            instance.dmMossClass?.hookAfterMethod(
-                if (instance.useNewMossFunc) "executeDmView" else "dmView",
-                instance.dmViewReqClass,
-            ) { it.result?.removeCmdDms() }
+            "com.bapis.bilibili.app.viewunite.v1.ViewProgressReq".from(mClassLoader)?.let { reqClass ->
+                instance.viewUniteMossClass?.hookAfterMethod(
+                    if (instance.useNewMossFunc) "executeViewProgress" else "viewProgress",
+                    reqClass
+                ) { param ->
+                    param.result?.run {
+                        callMethod("clearDm")
+                        callMethod("getVideoGuide")?.callMethod("clearContractCard")
+                    }
+                }
+            }
+            "com.bapis.bilibili.app.view.v1.TFInfoReq".from(mClassLoader)?.let { reqClass ->
+                instance.viewMossClass?.replaceMethod(
+                    if (instance.useNewMossFunc) "executeTFInfo" else "tFInfo",
+                    reqClass
+                ) { null }
+            }
+            instance.dmViewReqClass?.let { reqClass ->
+                instance.dmMossClass?.hookAfterMethod(
+                    if (instance.useNewMossFunc) "executeDmView" else "dmView",
+                    reqClass,
+                ) { it.result?.removeCmdDms() }
+            }
         }
         if (hidden && purifySearch) {
             "com.bapis.bilibili.app.interfaces.v1.SearchMoss".hookAfterMethod(
@@ -352,21 +360,25 @@ class ProtoBufHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     }
 
     private fun hookMossView() {
-        instance.viewUniteMossClass?.hookAfterMethod(
-            "executeView",
-            instance.viewUniteReqClass
-        ) { param ->
-            param.result?.let {
-                handleViewReply(it, true)
+        instance.viewUniteReqClass?.let { reqClass ->
+            instance.viewUniteMossClass?.hookAfterMethod(
+                "executeView",
+                reqClass
+            ) { param ->
+                param.result?.let {
+                    handleViewReply(it, true)
+                }
             }
         }
 
-        instance.viewMossClass?.hookAfterMethod(
-            if (instance.useNewMossFunc) "executeView" else "view",
-            instance.viewReqClass
-        ) { param ->
-            param.result?.let {
-                handleViewReply(it, false)
+        instance.viewReqClass?.let { reqClass ->
+            instance.viewMossClass?.hookAfterMethod(
+                if (instance.useNewMossFunc) "executeView" else "view",
+                reqClass
+            ) { param ->
+                param.result?.let {
+                    handleViewReply(it, false)
+                }
             }
         }
     }

@@ -19,23 +19,34 @@ typealias MethodHookParam = MethodHookParam
 typealias Replacer = (MethodHookParam) -> Any?
 typealias Hooker = (MethodHookParam) -> Unit
 
+@PublishedApi
+internal fun logHookFailure(e: Throwable, target: String? = null) {
+    HookStatus.recordFailure(e, target)
+    Log.e(e)
+}
+
+fun Class<*>.firstExistingMethodName(vararg names: String): String? =
+    names.firstOrNull { name ->
+        declaredMethods.any { it.name == name } || methods.any { it.name == name }
+    }
+
 fun Class<*>.hookMethod(method: String?, vararg args: Any?) = try {
     findAndHookMethod(this, method, *args)
 } catch (e: NoSuchMethodError) {
-    Log.e(e)
+    logHookFailure(e, "$name#$method")
     null
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$name#$method")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$name#$method")
     null
 }
 
 fun Member.hookMethod(callback: XC_MethodHook) = try {
     hookMethod(this, callback)
 } catch (e: Throwable) {
-    Log.e(e)
+    logHookFailure(e, "${declaringClass.name}#$name")
     null
 }
 
@@ -43,14 +54,14 @@ inline fun MethodHookParam.callHooker(crossinline hooker: Hooker) = try {
     hooker(this)
 } catch (e: Throwable) {
     Log.e("Error occurred calling hooker on ${this.method}")
-    Log.e(e)
+    logHookFailure(e, "${method.declaringClass.name}#${method.name}")
 }
 
 inline fun MethodHookParam.callReplacer(crossinline replacer: Replacer) = try {
     replacer(this)
 } catch (e: Throwable) {
     Log.e("Error occurred calling replacer on ${this.method}")
-    Log.e(e)
+    logHookFailure(e, "${method.declaringClass.name}#${method.name}")
     null
 }
 
@@ -97,13 +108,13 @@ fun Class<*>.hookAllMethods(methodName: String?, hooker: XC_MethodHook): Set<XC_
     try {
         hookAllMethods(this, methodName, hooker)
     } catch (e: NoSuchMethodError) {
-        Log.e(e)
+        logHookFailure(e, "$name#$methodName")
         emptySet()
     } catch (e: ClassNotFoundError) {
-        Log.e(e)
+        logHookFailure(e, "$name#$methodName")
         emptySet()
     } catch (e: ClassNotFoundException) {
-        Log.e(e)
+        logHookFailure(e, "$name#$methodName")
         emptySet()
     }
 
@@ -126,13 +137,13 @@ inline fun Class<*>.replaceAllMethods(methodName: String?, crossinline replacer:
 fun Class<*>.hookConstructor(vararg args: Any?) = try {
     findAndHookConstructor(this, *args)
 } catch (e: NoSuchMethodError) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     null
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     null
 }
 
@@ -154,13 +165,13 @@ inline fun Class<*>.replaceConstructor(vararg args: Any?, crossinline hooker: Ho
 fun Class<*>.hookAllConstructors(hooker: XC_MethodHook): Set<XC_MethodHook.Unhook> = try {
     hookAllConstructors(this, hooker)
 } catch (e: NoSuchMethodError) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     emptySet()
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     emptySet()
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$name#<init>")
     emptySet()
 }
 
@@ -182,10 +193,10 @@ inline fun Class<*>.replaceAllConstructors(crossinline hooker: Hooker) =
 fun String.hookMethod(classLoader: ClassLoader, method: String?, vararg args: Any?) = try {
     findClass(classLoader).hookMethod(method, *args)
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 }
 
@@ -197,10 +208,10 @@ inline fun String.hookBeforeMethod(
 ) = try {
     findClass(classLoader).hookBeforeMethod(method, *args, hooker = hooker)
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 }
 
@@ -212,10 +223,10 @@ inline fun String.hookAfterMethod(
 ) = try {
     findClass(classLoader).hookAfterMethod(method, *args, hooker = hooker)
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 }
 
@@ -227,10 +238,10 @@ inline fun String.replaceMethod(
 ) = try {
     findClass(classLoader).replaceMethod(method, *args, replacer = replacer)
 } catch (e: ClassNotFoundError) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 } catch (e: ClassNotFoundException) {
-    Log.e(e)
+    logHookFailure(e, "$this#$method")
     null
 }
 

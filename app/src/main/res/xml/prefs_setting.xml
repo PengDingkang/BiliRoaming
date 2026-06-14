@@ -46,6 +46,11 @@
             android:summary="@string/test_upos_summary"
             android:title="@string/test_upos_title" />
 
+        <Preference
+            android:key="official_video_diagnostics"
+            android:summary="@string/official_video_diagnostics_summary"
+            android:title="@string/official_video_diagnostics_title" />
+
         <SwitchPreference
             android:key="force_upos"
             android:summary="@string/force_upos_summary"

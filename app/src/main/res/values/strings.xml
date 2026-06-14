@@ -87,6 +87,10 @@
     <string name="speed">速度</string>
     <string name="test_upos_title">UPOS 服务器测速</string>
     <string name="test_upos_summary">选择最快的 UPOS 服务器以获得最好体验</string>
+    <string name="official_video_diagnostics_title">B站官方视频测速</string>
+    <string name="official_video_diagnostics_summary">打开网页端测速页，可用于对照当前网络与 CDN 表现</string>
+    <string name="official_video_diagnostics_url">https://www.bilibili.com/blackboard/video-diagnostics.html</string>
+    <string name="official_video_diagnostics_open_failed">无法打开官方测速页</string>
     <string name="search_area_title">开启其它地区番剧搜索</string>
     <string name="search_area_summary">在搜索页面添加其它地区番剧搜索结果，需要解析服务器支持</string>
     <string name="customize_bottom_bar_title">自定义底栏</string>
@@ -263,6 +267,9 @@
     <string name="block_pcdn_summary">【非必要不开启】可一定程度上优化视频加载速度，以实际情况为准</string>
     <string name="block_pcdn_live_title">阻止直播通过 PCDN 加载</string>
     <string name="block_pcdn_live_summary">【非必要不开启】避免占用大量上传带宽，同时可一定程度上优化直播加载速度，以实际情况为准</string>
+    <string name="hook_status_warning_badge">（疑似不兼容）</string>
+    <string name="hook_status_warning_summary">上次运行报错，当前客户端版本可能不兼容：%1$s</string>
+    <string name="hook_status_unknown_error">具体原因见模块日志</string>
     <string name="danmaku_filter_title">弹幕屏蔽等级</string>
     <string name="danmaku_filter_summary">恢复旧版按等级屏蔽弹幕功能，0级表示关闭本功能</string>
     <string name="danmaku_filter_weight_hint">%1$d级</string>

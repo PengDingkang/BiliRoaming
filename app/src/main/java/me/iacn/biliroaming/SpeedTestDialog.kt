@@ -98,13 +98,12 @@ class SpeedTestDialog(activity: Activity, prefs: SharedPreferences) :
                 dialog.setTitle("测速失败")
                 return@launch
             }
-            XposedInit.moduleRes.getStringArray(R.array.upos_entries)
-                .zip(XposedInit.moduleRes.getStringArray(R.array.upos_values)).asFlow().map {
+            CdnHostRepository.hosts.asFlow().map {
                     scope.launch {
-                        val item = SpeedTestResult(it.first, it.second, "...")
+                        val item = SpeedTestResult(it.name, it.host, "...")
                         adapter.add(item)
                         adapter.sort()
-                        val speed = speedTest(it.second, url)
+                        val speed = speedTest(it.host, url)
                         item.speed = speed.toString()
                         adapter.sort()
                     }

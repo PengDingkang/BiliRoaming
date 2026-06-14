@@ -1,4 +1,5 @@
 import com.google.protobuf.gradle.*
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.agp.app)
@@ -13,6 +14,17 @@ plugins {
 
 val appVerCode = jgit.repo()?.commitCount("refs/remotes/origin/master") ?: 0
 val appVerName: String by rootProject
+
+rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->
+    Properties().apply {
+        file.inputStream().use(::load)
+    }.forEach { key, value ->
+        val propertyName = key.toString()
+        if (!rootProject.extra.has(propertyName)) {
+            rootProject.extra.set(propertyName, value.toString())
+        }
+    }
+}
 
 apksign {
     storeFileProperty = "releaseStoreFile"

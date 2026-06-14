@@ -21,9 +21,9 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 }
             }
             // v8.28.0 - ?
-            runCatching { it.hookAfterMethod(instance.getPreBuiltConfigMethod(), hooker = hooker) }
+            it.hookAfterExistingMethod(instance.getPreBuiltConfigMethod(), hooker = hooker)
             // ? - v8.48.0 ..
-            runCatching { it.hookAfterMethod(instance.getPreBuiltConfigMethod(), it, hooker = hooker) }
+            it.hookAfterExistingMethod(instance.getPreBuiltConfigMethod(), it, hooker = hooker)
         }
 
         // TypedContext
@@ -38,9 +38,9 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 }
             }
             // v8.28.0 - ?
-            runCatching { it.hookAfterMethod(instance.getDataSPMethod(), hooker = hooker) }
+            it.hookAfterExistingMethod(instance.getDataSPMethod(), hooker = hooker)
             // ? - v8.48.0 ..
-            runCatching { it.hookAfterMethod(instance.getDataSPMethod(), it, hooker = hooker) }
+            it.hookAfterExistingMethod(instance.getDataSPMethod(), it, hooker = hooker)
         }
 
         "com.bilibili.lib.blconfig.internal.OverrideConfig".findClassOrNull(mClassLoader)
@@ -132,5 +132,16 @@ class EnvHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 "1"
             ),
         )
+    }
+
+    private fun Class<*>.hookAfterExistingMethod(
+        methodName: String?,
+        vararg parameterTypes: Class<*>,
+        hooker: Hooker
+    ) {
+        methodName ?: return
+        declaredMethods.firstOrNull {
+            it.name == methodName && it.parameterTypes.contentEquals(parameterTypes)
+        }?.hookAfterMethod(hooker)
     }
 }

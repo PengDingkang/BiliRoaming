@@ -74,8 +74,9 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             super.onCreate(savedInstanceState)
             preferenceManager.sharedPreferencesName = "biliroaming"
             prefs = preferenceManager.sharedPreferences
-            checkUposServer()
             addPreferencesFromResource(R.xml.prefs_setting)
+            setupUposPreference()
+            checkUposServer()
             biliprefs = currentContext.getSharedPreferences(
                 packageName + "_preferences",
                 Context.MODE_MULTI_PROCESS
@@ -92,6 +93,7 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
                 XposedInit.moduleRes.getString(R.string.save_log_summary).format(logFile.absolutePath)
             findPreference("custom_server")?.onPreferenceClickListener = this
             findPreference("test_upos")?.onPreferenceClickListener = this
+            findPreference("official_video_diagnostics")?.onPreferenceClickListener = this
             findPreference("customize_bottom_bar")?.onPreferenceClickListener = this
             findPreference("pref_export")?.onPreferenceClickListener = this
             findPreference("pref_import")?.onPreferenceClickListener = this
@@ -112,6 +114,7 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             findPreference("purify_story_video_ad")?.onPreferenceClickListener = this
             findPreference("long_press_speed")?.onPreferenceClickListener = this
             checkCompatibleVersion()
+            markHookStatus()
             searchItems = retrieve(preferenceScreen)
             checkUpdate()
         }
@@ -214,13 +217,23 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
 
         private fun checkUposServer() {
             val currentServer = prefs.getString("upos_host", null).orEmpty()
-            val serverList = XposedInit.moduleRes.getStringArray(R.array.upos_values)
+            val serverList = CdnHostRepository.values()
             if (currentServer !in serverList) {
                 scope.launch(Dispatchers.IO) {
                     val defaultServer =
-                        if (isLocatedCn) serverList[1] else """$1"""
+                        if (isLocatedCn) CdnHostRepository.HW_HOST
+                        else CdnHostRepository.DEFAULT_HOST
                     prefs.edit().putString("upos_host", defaultServer).apply()
                 }
+            }
+        }
+
+        private fun setupUposPreference() {
+            (findPreference("upos_host") as? ListPreference)?.run {
+                entries = CdnHostRepository.entries(
+                    XposedInit.moduleRes.getStringArray(R.array.upos_entries).first()
+                )
+                entryValues = CdnHostRepository.values()
             }
         }
 
@@ -341,6 +354,52 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
                 isEnabled = false
                 summary = message
                 if (this is SwitchPreference) this.isChecked = false
+            }
+        }
+
+        private fun markHookStatus() {
+            val failedKeys = HookStatus.failedPreferenceKeys()
+            if (failedKeys.isEmpty()) return
+            failedKeys.forEach { key ->
+                findPreference(key)?.markHookFailed(HookStatus.detailForPreference(key))
+            }
+        }
+
+        private fun Preference.markHookFailed(detail: String?) {
+            val red = Color.rgb(211, 47, 47)
+            val badge = XposedInit.moduleRes.getString(R.string.hook_status_warning_badge)
+            val oldTitle = title ?: key ?: return
+            title = SpannableStringBuilder(oldTitle).apply {
+                val start = length
+                append(" ")
+                append(badge)
+                setSpan(
+                    ForegroundColorSpan(red),
+                    start,
+                    length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                setSpan(StyleSpan(Typeface.BOLD), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+
+            val warning = XposedInit.moduleRes.getString(
+                R.string.hook_status_warning_summary,
+                detail ?: XposedInit.moduleRes.getString(R.string.hook_status_unknown_error)
+            )
+            val oldSummary = summary
+            summary = SpannableStringBuilder().apply {
+                val start = length
+                append(warning)
+                setSpan(
+                    ForegroundColorSpan(red),
+                    start,
+                    length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                if (!oldSummary.isNullOrBlank()) {
+                    appendLine()
+                    append(oldSummary)
+                }
             }
         }
 
@@ -591,6 +650,24 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
         private fun onTestUposClick(): Boolean {
             SpeedTestDialog(activity, prefs).show()
             return true
+        }
+
+        private fun onOfficialVideoDiagnosticsClick(): Boolean {
+            val uri = Uri.parse(XposedInit.moduleRes.getString(R.string.official_video_diagnostics_url))
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addCategory(Intent.CATEGORY_BROWSABLE)
+            }
+            return try {
+                startActivity(intent)
+                true
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(
+                    activity,
+                    XposedInit.moduleRes.getString(R.string.official_video_diagnostics_open_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+                true
+            }
         }
 
         private fun onCustomizeBottomBarClick(): Boolean {
@@ -968,6 +1045,7 @@ class SettingDialog(context: Context) : AlertDialog.Builder(context) {
             "customize_dynamic" -> onCustomDynamicClick()
             "danmaku_filter" -> onDanmakuFilterClick()
             "default_speed" -> onDefaultSpeedClick()
+            "official_video_diagnostics" -> onOfficialVideoDiagnosticsClick()
             "filter_search" -> onFilterSearchClick()
             "filter_comment" -> onFilterCommentClick()
             "copy_access_key" -> onCopyAccessKeyClick()

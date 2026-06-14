@@ -618,58 +618,66 @@ class PegasusHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             removeRelateNothing || it.callMethodAs("getRelateCardTypeValue") !in allowTypeList || shouldFiltered
         }
 
-        instance.viewMossClass?.hookAfterMethod(
-            if (instance.useNewMossFunc) "executeView" else "view",
-            instance.viewReqClass
-        ) { param ->
-            param.result ?: return@hookAfterMethod
-            if (removeRelatePromote && removeRelateOnlyAv && removeRelateNothing) {
-                param.result.callMethod("clearRelates")
-                param.result.callMethod("clearPagination")
-                return@hookAfterMethod
+        instance.viewReqClass?.let { reqClass ->
+            instance.viewMossClass?.hookAfterMethod(
+                if (instance.useNewMossFunc) "executeView" else "view",
+                reqClass
+            ) { param ->
+                param.result ?: return@hookAfterMethod
+                if (removeRelatePromote && removeRelateOnlyAv && removeRelateNothing) {
+                    param.result.callMethod("clearRelates")
+                    param.result.callMethod("clearPagination")
+                    return@hookAfterMethod
+                }
+                param.result.callMethod("ensureRelatesIsMutable")
+                param.result.callMethodAs<MutableList<Any>>("getRelatesList").filter()
             }
-            param.result.callMethod("ensureRelatesIsMutable")
-            param.result.callMethodAs<MutableList<Any>>("getRelatesList").filter()
         }
-        instance.viewMossClass?.hookAfterMethod(
-            if (instance.useNewMossFunc) "executeRelatesFeed" else "relatesFeed",
-            "com.bapis.bilibili.app.view.v1.RelatesFeedReq"
-        ) { param ->
-            param.result ?: return@hookAfterMethod
-            param.result.callMethod("ensureListIsMutable")
-            param.result.callMethodAs<MutableList<Any>>("getListList").filter()
+        "com.bapis.bilibili.app.view.v1.RelatesFeedReq".from(mClassLoader)?.let { reqClass ->
+            instance.viewMossClass?.hookAfterMethod(
+                if (instance.useNewMossFunc) "executeRelatesFeed" else "relatesFeed",
+                reqClass
+            ) { param ->
+                param.result ?: return@hookAfterMethod
+                param.result.callMethod("ensureListIsMutable")
+                param.result.callMethodAs<MutableList<Any>>("getListList").filter()
+            }
         }
 
         instance.viewUniteMossClass?.run {
-            hookAfterMethod(
-                if (instance.useNewMossFunc) "executeView" else "view",
-                instance.viewUniteReqClass
-            ) { param ->
-                param.result ?: return@hookAfterMethod
-                param.result.callMethod("getTab")?.run {
-                    callMethod("ensureTabModuleIsMutable")
-                    callMethodAs<MutableList<Any>>("getTabModuleList").map { originalTabModules ->
-                        if (!originalTabModules.callMethodAs<Boolean>("hasIntroduction")) return@map
-                        originalTabModules.callMethodAs<Any>("getIntroduction").run {
-                            callMethod("ensureModulesIsMutable")
-                            callMethodAs<MutableList<Any>>("getModulesList").map { module ->
-                                if (!module.callMethodAs<Boolean>("hasRelates")) return@map
-                                module.callMethodAs<Any>("getRelates").run {
-                                    callMethod("ensureCardsIsMutable")
-                                    callMethodAs<MutableList<Any>>("getCardsList").filterUnite()
+            instance.viewUniteReqClass?.let { reqClass ->
+                hookAfterMethod(
+                    if (instance.useNewMossFunc) "executeView" else "view",
+                    reqClass
+                ) { param ->
+                    param.result ?: return@hookAfterMethod
+                    param.result.callMethod("getTab")?.run {
+                        callMethod("ensureTabModuleIsMutable")
+                        callMethodAs<MutableList<Any>>("getTabModuleList").map { originalTabModules ->
+                            if (!originalTabModules.callMethodAs<Boolean>("hasIntroduction")) return@map
+                            originalTabModules.callMethodAs<Any>("getIntroduction").run {
+                                callMethod("ensureModulesIsMutable")
+                                callMethodAs<MutableList<Any>>("getModulesList").map { module ->
+                                    if (!module.callMethodAs<Boolean>("hasRelates")) return@map
+                                    module.callMethodAs<Any>("getRelates").run {
+                                        callMethod("ensureCardsIsMutable")
+                                        callMethodAs<MutableList<Any>>("getCardsList").filterUnite()
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            hookAfterMethod(
-                if (instance.useNewMossFunc) "executeRelatesFeed" else "relatesFeed",
-                "com.bapis.bilibili.app.viewunite.v1.RelatesFeedReq"
-            ) { param ->
-                param.result?.run {
-                    callMethod("ensureRelatesIsMutable")
-                    callMethodAs<MutableList<Any>>("getRelatesList").filterUnite()
+            "com.bapis.bilibili.app.viewunite.v1.RelatesFeedReq".from(mClassLoader)?.let { reqClass ->
+                hookAfterMethod(
+                    if (instance.useNewMossFunc) "executeRelatesFeed" else "relatesFeed",
+                    reqClass
+                ) { param ->
+                    param.result?.run {
+                        callMethod("ensureRelatesIsMutable")
+                        callMethodAs<MutableList<Any>>("getRelatesList").filterUnite()
+                    }
                 }
             }
         }

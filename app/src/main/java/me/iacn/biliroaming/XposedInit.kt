@@ -56,6 +56,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     Log.d("Bilibili version: ${getPackageVersion(lpparam.packageName)} (${if (is64) "64" else "32"}bit)")
                     Log.d("SDK: ${Build.VERSION.RELEASE}(${Build.VERSION.SDK_INT}); Phone: ${Build.BRAND} ${Build.MODEL}")
                     Log.d("Config: ${sPrefs.all}")
+                    HookStatus.clearForNewRun()
                     Log.toast(
                         "哔哩漫游已激活${
                             if (sPrefs.getBoolean("main_func", false) &&
@@ -162,11 +163,16 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
     }
 
     private fun startHook(hookerCreater: () -> BaseHook) {
+        var hookName: String? = null
         try {
             val hooker = hookerCreater()
+            hookName = hooker.javaClass.simpleName
             hookers.add(hooker)
-            hooker.startHook()
+            HookStatus.withHook(hookName) {
+                hooker.startHook()
+            }
         } catch (e: Throwable) {
+            HookStatus.recordFailure(e, hookName = hookName)
             Log.e(e)
             Log.toast("出现错误\n${e.message}\n部分功能可能失效。${e.stackTrace.joinToString("\n")}")
         }
@@ -175,8 +181,11 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
     private fun startLateHook() {
         hookers.forEach {
             try {
-                it.lateInitHook()
+                HookStatus.withHook(it.javaClass.simpleName) {
+                    it.lateInitHook()
+                }
             } catch (e: Throwable) {
+                HookStatus.recordFailure(e, hookName = it.javaClass.simpleName)
                 Log.e(e)
                 Log.toast("出现错误\n${e.message}\n部分功能可能失效。${e.stackTrace.joinToString("\n")}")
             }

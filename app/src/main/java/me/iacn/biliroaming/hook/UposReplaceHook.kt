@@ -1,17 +1,22 @@
 package me.iacn.biliroaming.hook
 
 import me.iacn.biliroaming.utils.Log
+import me.iacn.biliroaming.utils.UposReplaceHelper.debugConfigSummary
 import me.iacn.biliroaming.utils.UposReplaceHelper.enableLivePcdnBlock
 import me.iacn.biliroaming.utils.UposReplaceHelper.enablePcdnBlock
 import me.iacn.biliroaming.utils.UposReplaceHelper.enableUposReplace
 import me.iacn.biliroaming.utils.UposReplaceHelper.forceUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.gotchaRegex
+import me.iacn.biliroaming.utils.UposReplaceHelper.hostForLog
+import me.iacn.biliroaming.utils.UposReplaceHelper.hostsForLog
 import me.iacn.biliroaming.utils.UposReplaceHelper.initVideoUposList
 import me.iacn.biliroaming.utils.UposReplaceHelper.isNeedReplaceVideoUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.isOverseaUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.isPCdnUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.liveUpos
+import me.iacn.biliroaming.utils.UposReplaceHelper.logUposDebug
 import me.iacn.biliroaming.utils.UposReplaceHelper.replaceUpos
+import me.iacn.biliroaming.utils.UposReplaceHelper.videoReplaceReason
 import me.iacn.biliroaming.utils.UposReplaceHelper.videoUposBackups
 import me.iacn.biliroaming.utils.from
 import me.iacn.biliroaming.utils.getObjectFieldOrNull
@@ -23,18 +28,44 @@ import me.iacn.biliroaming.utils.setObjectField
 
 class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     override fun startHook() {
-        if (!enableUposReplace || !(forceUpos || enablePcdnBlock || enableLivePcdnBlock)) return
+        if (!enableUposReplace || !(forceUpos || enablePcdnBlock || enableLivePcdnBlock)) {
+            logUposDebug { "startHook skipped ${debugConfigSummary()}" }
+            return
+        }
         Log.d("startHook: UposReplaceHook")
+        logUposDebug { "startHook active ${debugConfigSummary()}" }
         "tv.danmaku.ijk.media.player.IjkMediaAsset\$MediaAssertSegment\$Builder".from(mClassLoader)
             ?.run {
                 hookBeforeConstructor(String::class.java, Int::class.javaPrimitiveType) { param ->
                     val baseUrl = param.args[0] as String
                     if (baseUrl.contains("live-bvc")) {
                         if (enableLivePcdnBlock && !baseUrl.contains(gotchaRegex)) {
-                            param.args[0] = baseUrl.replaceUpos(liveUpos)
+                            val replaced = baseUrl.replaceUpos(liveUpos)
+                            param.args[0] = replaced
+                            logUposDebug {
+                                "IjkMediaAsset live replace from=${baseUrl.hostForLog()} " +
+                                        "to=${replaced.hostForLog()}"
+                            }
+                        } else {
+                            logUposDebug {
+                                "IjkMediaAsset live skip host=${baseUrl.hostForLog()} " +
+                                        "blockLivePcdn=$enableLivePcdnBlock gotcha=${baseUrl.contains(gotchaRegex)}"
+                            }
                         }
-                    } else if (baseUrl.isNeedReplaceVideoUpos()) {
-                        param.args[0] = baseUrl.replaceUpos()
+                    } else {
+                        val reason = baseUrl.videoReplaceReason()
+                        if (baseUrl.isNeedReplaceVideoUpos()) {
+                            val replaced = baseUrl.replaceUpos()
+                            param.args[0] = replaced
+                            logUposDebug {
+                                "IjkMediaAsset video replace reason=$reason from=${baseUrl.hostForLog()} " +
+                                        "to=${replaced.hostForLog()}"
+                            }
+                        } else {
+                            logUposDebug {
+                                "IjkMediaAsset video skip reason=$reason host=${baseUrl.hostForLog()}"
+                            }
+                        }
                     }
                 }
 
@@ -59,6 +90,10 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         baseUrl, backupUrls, mediaAssertSegment
                     ).takeIf { it.isNotEmpty() }?.let {
                         param.args[0] = it
+                        logUposDebug {
+                            "IjkMediaAsset backup replace base=${baseUrl.hostForLog()} " +
+                                    "input=${backupUrls.hostsForLog()} output=${it.hostsForLog()}"
+                        }
                     }
                 }
             }
@@ -74,14 +109,26 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
         val rawUrl = backupUrls.firstOrNull() ?: baseUrl
         return if (baseUrl.isPCdnUpos()) {
             if (backupUrls.isNotEmpty()) {
-                mediaAssertSegment?.setObjectField("url", rawUrl.replaceUpos())
+                val newBaseUrl = rawUrl.replaceUpos()
+                mediaAssertSegment?.setObjectField("url", newBaseUrl)
                 listOf(rawUrl.replaceUpos(videoUposBackups[0], rawUrl.isOverseaUpos()), baseUrl)
+                    .also {
+                        logUposDebug {
+                            "reconstructBackup basePcdn from=${baseUrl.hostForLog()} " +
+                                    "newBase=${newBaseUrl.hostForLog()} backups=${it.hostsForLog()}"
+                        }
+                    }
             } else emptyList()
         } else {
             if (enablePcdnBlock || forceUpos || backupUrls.isEmpty() || rawUrl.isOverseaUpos()) {
                 listOf(
                     rawUrl.replaceUpos(videoUposBackups[0]), rawUrl.replaceUpos(videoUposBackups[1])
-                )
+                ).also {
+                    logUposDebug {
+                        "reconstructBackup regular base=${baseUrl.hostForLog()} " +
+                                "raw=${rawUrl.hostForLog()} backups=${it.hostsForLog()}"
+                    }
+                }
             } else emptyList()
         }
     }

@@ -9,3 +9,6 @@
 *.apk
 *.jar
 /.kotlin
+/signing/
+*.jks
+*.keystore
