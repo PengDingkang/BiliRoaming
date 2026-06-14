@@ -2,8 +2,11 @@ package me.iacn.biliroaming.utils
 
 import android.content.SharedPreferences
 import android.net.Uri
+import java.io.File
 
 object OfficialVideoDiagnosticsHelper {
+    const val LOG_PREFIX = "OfficialDiagnostics"
+
     private const val SESSION_UPOS_HOST = "official_video_diagnostics_upos_host"
     private const val SESSION_UNTIL = "official_video_diagnostics_until"
     private const val SESSION_TTL_MS = 10 * 60 * 1000L
@@ -15,10 +18,17 @@ object OfficialVideoDiagnosticsHelper {
         Regex("""https?:\\/\\/([^\\/"'\s]+)""", RegexOption.IGNORE_CASE)
 
     fun markSession(prefs: SharedPreferences) {
+        val selected = selectedUposHost()
+        val until = System.currentTimeMillis() + SESSION_TTL_MS
         prefs.edit()
-            .putString(SESSION_UPOS_HOST, selectedUposHost().orEmpty())
-            .putLong(SESSION_UNTIL, System.currentTimeMillis() + SESSION_TTL_MS)
+            .putString(SESSION_UPOS_HOST, selected.orEmpty())
+            .putLong(SESSION_UNTIL, until)
             .apply()
+        Log.d(
+            "$LOG_PREFIX markSession process=${processName()} selected=$selected " +
+                    "rawPrefs=${prefs.getString("upos_host", null)} " +
+                    "rawSPrefs=${sPrefs.getString("upos_host", null)} until=$until"
+        )
     }
 
     fun activeSessionUposHost(): String? {
@@ -41,6 +51,22 @@ object OfficialVideoDiagnosticsHelper {
         return uri.buildUpon().authority(target).build().toString()
     }
 
+    fun describeUrlDecision(url: String, target: String): String {
+        val uri = runCatchingOrNull { Uri.parse(url) }
+            ?: return "decision=parse_failed target=$target url=${url.take(120)}"
+        val authority = uri.encodedAuthority
+            ?: return "decision=no_authority target=$target url=${url.take(120)}"
+        val host = authority.substringBefore(':')
+        val mediaHost = authority.isDiagnosticsMediaHost()
+        val replaced = if (mediaHost) replaceMediaHostInUrl(url, target) else url
+        val decision = when {
+            !mediaHost -> "skip_non_media_host"
+            replaced == url -> "skip_same_url"
+            else -> "replace"
+        }
+        return "decision=$decision host=$host target=$target url=${urlForLog(url)}"
+    }
+
     fun replaceMediaHostInText(text: String, target: String): String {
         if (!text.contains("bilivideo", true) &&
             !text.contains("acgvideo", true) &&
@@ -56,6 +82,36 @@ object OfficialVideoDiagnosticsHelper {
             if (host.isDiagnosticsMediaHost()) match.value.replace(host, target) else match.value
         }
     }
+
+    fun mediaHostsInTextForLog(text: String): String {
+        val hosts = (normalMediaUrlRegex.findAll(text).map { it.groupValues[1] } +
+                escapedMediaUrlRegex.findAll(text).map { it.groupValues[1] })
+            .filter { it.isDiagnosticsMediaHost() }
+            .map { it.substringBefore(':') }
+            .distinct()
+            .take(8)
+            .toList()
+        return if (hosts.isEmpty()) "none" else hosts.joinToString()
+    }
+
+    fun sessionDebugSummary(): String {
+        val now = System.currentTimeMillis()
+        val until = sPrefs.getLong(SESSION_UNTIL, 0L)
+        return "process=${processName()} active=${activeSessionUposHost()} " +
+                "selected=${selectedUposHost()} rawSession=${sPrefs.getString(SESSION_UPOS_HOST, null)} " +
+                "rawUpos=${sPrefs.getString("upos_host", null)} until=$until now=$now ttl=${until - now}"
+    }
+
+    fun urlForLog(url: String): String =
+        runCatchingOrNull {
+            val uri = Uri.parse(url)
+            "${uri.scheme}://${uri.encodedAuthority}${uri.encodedPath.orEmpty()}"
+        } ?: url.take(120)
+
+    fun processName(): String =
+        runCatchingOrNull {
+            File("/proc/self/cmdline").readText().trim('\u0000').takeIf { it.isNotBlank() }
+        } ?: currentContext.packageName
 
     fun String.isDiagnosticsMediaHost(): Boolean {
         val host = substringBefore(':').lowercase()

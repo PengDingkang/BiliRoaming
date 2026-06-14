@@ -53,6 +53,7 @@ object UposReplaceHelper {
         Regex("""(szbdyd\.com|\.mcdn\.bilivideo|\.mcdn\.biliapi|pcdn)""", RegexOption.IGNORE_CASE)
     }
     val gotchaRegex by lazy { Regex("""https?://[\w-]*--[\w-]*-gotcha[\w-]*\.bilivideo""") }
+    private val skipTfOverride = ThreadLocal<Boolean>()
 
     fun logUposDebug(message: () -> String) {
         if (BuildConfig.DEBUG) {
@@ -170,11 +171,21 @@ object UposReplaceHelper {
 
     fun Uri.replaceUpos(upos: String): Uri = buildUpon().authority(upos).build()
 
+    fun <T> withoutTfOverride(block: () -> T): T {
+        skipTfOverride.set(true)
+        return try {
+            block()
+        } finally {
+            skipTfOverride.remove()
+        }
+    }
+
     private fun hookTf(mClassLoader: ClassLoader) {
         if (!(enablePcdnBlock || forceUpos)) return
         // fake grpc TF header then only reply with mirror type playurl
         "com.bilibili.lib.moss.utils.RuntimeHelper".from(mClassLoader)
             ?.hookAfterMethod("tf") { param ->
+                if (skipTfOverride.get() == true) return@hookAfterMethod
                 val result = param.result
                 if (result.callMethodOrNullAs<Int>("getNumber") != 0) return@hookAfterMethod
                 result.javaClass.callStaticMethodOrNull("forNumber", 1)?.let {

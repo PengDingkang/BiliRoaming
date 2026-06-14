@@ -10,15 +10,21 @@ import kotlinx.coroutines.launch
 import me.iacn.biliroaming.BuildConfig
 import me.iacn.biliroaming.XposedInit.Companion.moduleRes
 import me.iacn.biliroaming.utils.*
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.LOG_PREFIX
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.describeUrlDecision
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.isDiagnosticsPage
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.mediaHostsInTextForLog
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.replaceMediaHostInText
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.replaceMediaHostInUrl
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.selectedUposHost
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.sessionDebugSummary
+import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.urlForLog
 import me.iacn.biliroaming.utils.UposReplaceHelper.hostForLog
 
 
 class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     private val hookedClient = HashSet<Class<*>>()
+    private val diagnosticsLogs = LinkedHashSet<String>()
 
     private val jsHooker = object : Any() {
         @Suppress("UNUSED")
@@ -100,11 +106,24 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
     fun hook(pageUrl: String, url: String, text: String): String {
         if (!isDiagnosticsPage(pageUrl)) return hook(url, text)
-        val target = selectedUposHost() ?: return text
+        val target = selectedUposHost() ?: run {
+            logDiagnosticsLimited(
+                "web_no_target",
+                "$LOG_PREFIX web response skip reason=no_target page=${urlForLog(pageUrl)} " +
+                        "url=${urlForLog(url)} session=${sessionDebugSummary()}"
+            )
+            return text
+        }
         val replaced = replaceMediaHostInText(text, target)
+        val hosts = mediaHostsInTextForLog(text)
         if (replaced != text) {
             Log.d(
-                "official diagnostics CDN response ${url.hostForLog()} -> $target"
+                "$LOG_PREFIX web response replaced url=${url.hostForLog()} target=$target hosts=$hosts"
+            )
+        } else if (hosts != "none" || url.looksRelevantForDiagnosticsLog()) {
+            logDiagnosticsLimited(
+                "web_response:${urlForLog(url)}:$hosts",
+                "$LOG_PREFIX web response skip url=${urlForLog(url)} target=$target hosts=$hosts len=${text.length}"
             )
         }
         return replaced
@@ -112,12 +131,39 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
 
     fun hookRequest(pageUrl: String, url: String): String {
         if (!isDiagnosticsPage(pageUrl)) return url
-        val target = selectedUposHost() ?: return url
+        val target = selectedUposHost() ?: run {
+            logDiagnosticsLimited(
+                "web_request_no_target",
+                "$LOG_PREFIX web request skip reason=no_target page=${urlForLog(pageUrl)} " +
+                        "url=${urlForLog(url)} session=${sessionDebugSummary()}"
+            )
+            return url
+        }
         return replaceMediaHostInUrl(url, target).also { replaced ->
             if (replaced != url) {
-                Log.d("official diagnostics CDN request ${url.hostForLog()} -> $target")
+                Log.d("$LOG_PREFIX web request replaced ${url.hostForLog()} -> $target original=${urlForLog(url)}")
+            } else if (url.looksRelevantForDiagnosticsLog()) {
+                logDiagnosticsLimited(
+                    "web_request:${urlForLog(url)}",
+                    "$LOG_PREFIX web request ${describeUrlDecision(url, target)}"
+                )
             }
         }
+    }
+
+    private fun String.looksRelevantForDiagnosticsLog(): Boolean =
+        contains("bilivideo", true) ||
+                contains("acgvideo", true) ||
+                contains("akamaized", true) ||
+                contains("mountaintoys", true) ||
+                contains("playurl", true) ||
+                contains("video-diagnostics", true)
+
+    private fun logDiagnosticsLimited(key: String, message: String) {
+        synchronized(diagnosticsLogs) {
+            if (diagnosticsLogs.size >= 80 || !diagnosticsLogs.add(key)) return
+        }
+        Log.d(message)
     }
 
     override fun lateInitHook() {

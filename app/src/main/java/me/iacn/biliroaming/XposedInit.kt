@@ -119,6 +119,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { VipSectionHook(lpparam.classLoader) }
                     startHook { CommentImageHook(lpparam.classLoader) }
                     startHook { WebViewHook(lpparam.classLoader) }
+                    startHook { OfficialVideoDiagnosticsHook(lpparam.classLoader) }
                     startHook { P2pHook(lpparam.classLoader) }
                     startHook { DanmakuHook(lpparam.classLoader) }
                     startHook { BangumiPageAdHook(lpparam.classLoader) }
@@ -130,6 +131,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     startHook { LiveQualityHook(lpparam.classLoader) }
                     startHook { StoryPlayerAdHook(lpparam.classLoader) }
                     startHook { LongPressSpeed(lpparam.classLoader) }
+                    startHook { RecentVideoHook(lpparam.classLoader) }
                     startHook { SkipVideoAd(lpparam.classLoader) }
                 }
 

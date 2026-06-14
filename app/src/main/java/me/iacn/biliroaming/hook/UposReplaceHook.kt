@@ -1,6 +1,7 @@
 package me.iacn.biliroaming.hook
 
 import me.iacn.biliroaming.utils.Log
+import me.iacn.biliroaming.utils.RecentPlaybackUrlStore
 import me.iacn.biliroaming.utils.UposReplaceHelper.debugConfigSummary
 import me.iacn.biliroaming.utils.UposReplaceHelper.enableLivePcdnBlock
 import me.iacn.biliroaming.utils.UposReplaceHelper.enablePcdnBlock
@@ -57,6 +58,7 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                         if (baseUrl.isNeedReplaceVideoUpos()) {
                             val replaced = baseUrl.replaceUpos()
                             param.args[0] = replaced
+                            RecentPlaybackUrlStore.save(replaced, "IjkMediaAsset:$reason")
                             logUposDebug {
                                 "IjkMediaAsset video replace reason=$reason from=${baseUrl.hostForLog()} " +
                                         "to=${replaced.hostForLog()}"
@@ -88,11 +90,19 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     }
                     reconstructBackupUposList(
                         baseUrl, backupUrls, mediaAssertSegment
-                    ).takeIf { it.isNotEmpty() }?.let {
-                        param.args[0] = it
+                    ).takeIf { it.isNotEmpty() }?.let { newBackups ->
+                        param.args[0] = newBackups
+                        val playbackBase =
+                            mediaAssertSegment?.getObjectFieldOrNullAs<String>("url")
+                                .orEmpty()
+                                .ifBlank { baseUrl }
+                        RecentPlaybackUrlStore.saveAll(
+                            listOf(playbackBase) + newBackups,
+                            "IjkMediaAsset:backup"
+                        )
                         logUposDebug {
                             "IjkMediaAsset backup replace base=${baseUrl.hostForLog()} " +
-                                    "input=${backupUrls.hostsForLog()} output=${it.hostsForLog()}"
+                                    "input=${backupUrls.hostsForLog()} output=${newBackups.hostsForLog()}"
                         }
                     }
                 }

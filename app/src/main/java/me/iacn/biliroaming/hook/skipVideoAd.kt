@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import me.iacn.biliroaming.BiliBiliPackage.Companion.instance
 import me.iacn.biliroaming.utils.BilibiliSponsorBlock
 import me.iacn.biliroaming.utils.Log
+import me.iacn.biliroaming.utils.RecentVideoStore
 import me.iacn.biliroaming.utils.av2bv
 import me.iacn.biliroaming.utils.callMethod
 import me.iacn.biliroaming.utils.callMethodAs
@@ -145,16 +146,20 @@ class SkipVideoAd(classLoader: ClassLoader) : BaseHook(classLoader) {
     }
 
     private fun updateVideoIdentity(newBvid: String, newCid: String) {
-        if (newBvid.isBlank() || newCid.isBlank() || newCid == "0") return
-        val newVideoKey = "$newBvid:$newCid"
+        val normalizedCid = RecentVideoStore.parsePositiveLong(newCid)?.toString() ?: return
+        if (newBvid.isBlank()) return
+        val newVideoKey = "$newBvid:$normalizedCid"
         if (newVideoKey == videoKey()) return
         bvid = newBvid
-        cid = newCid
+        cid = normalizedCid
         duration = -1
         segments = null
         loadingVideoKey = null
         waitTime = 1000
         Log.d("SkipVideoAd: video changed bvid=$bvid cid=$cid")
+        RecentVideoStore.parsePositiveLong(cid)?.let {
+            RecentVideoStore.saveFromBvid(bvid, it, "skipVideoAd")
+        }
         loadSegmentsIfNeeded()
     }
 
