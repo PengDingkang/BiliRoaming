@@ -75,6 +75,7 @@ object UposReplaceHelper {
         joinToString(prefix = "[", postfix = "]") { it.hostForLog() }
 
     fun String.videoReplaceReason(): String = when {
+        isLocalPlaybackUrl() -> "skip_local_playback"
         contains(".mcdn.bilivideo", ignoreCase = true) -> "skip_mcdn_bilivideo"
         contains(".mcdn.biliapi", ignoreCase = true) -> "skip_mcdn_biliapi"
         contains(ipPCdnRegex) -> "skip_ip_pcdn"
@@ -135,7 +136,8 @@ object UposReplaceHelper {
     fun String.isOverseaUpos() = isLocatedCn == contains(overseaVideoUposRegex)
 
     fun String.isNeedReplaceVideoUpos() =
-        if (contains(".mcdn.bilivideo", ignoreCase = true) ||
+        if (isLocalPlaybackUrl() ||
+            contains(".mcdn.bilivideo", ignoreCase = true) ||
             contains(".mcdn.biliapi", ignoreCase = true) ||
             contains(ipPCdnRegex)
         ) {
@@ -148,6 +150,15 @@ object UposReplaceHelper {
                     (enablePcdnBlock && isPCdnUpos()) ||
                     isOverseaUpos()
         }
+
+    fun String.isLocalPlaybackUrl(): Boolean {
+        if (!startsWith("http", ignoreCase = true)) return false
+        val host = runCatchingOrNull { Uri.parse(this).host?.lowercase() } ?: return false
+        return host == "localhost" ||
+                host == "0.0.0.0" ||
+                host == "::1" ||
+                host.startsWith("127.")
+    }
 
     fun String.replaceUpos(
         upos: String = videoUposBase, needReplace: Boolean = true

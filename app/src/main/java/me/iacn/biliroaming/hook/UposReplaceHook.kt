@@ -12,6 +12,7 @@ import me.iacn.biliroaming.utils.UposReplaceHelper.hostForLog
 import me.iacn.biliroaming.utils.UposReplaceHelper.hostsForLog
 import me.iacn.biliroaming.utils.UposReplaceHelper.initVideoUposList
 import me.iacn.biliroaming.utils.UposReplaceHelper.isNeedReplaceVideoUpos
+import me.iacn.biliroaming.utils.UposReplaceHelper.isLocalPlaybackUrl
 import me.iacn.biliroaming.utils.UposReplaceHelper.isOverseaUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.isPCdnUpos
 import me.iacn.biliroaming.utils.UposReplaceHelper.liveUpos
@@ -77,6 +78,12 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                     val baseUrl =
                         mediaAssertSegment?.getObjectFieldOrNullAs<String>("url").orEmpty()
                     if (baseUrl.isEmpty()) return@hookBeforeMethod
+                    if (baseUrl.isLocalPlaybackUrl()) {
+                        logUposDebug {
+                            "IjkMediaAsset backup skip local playback host=${baseUrl.hostForLog()}"
+                        }
+                        return@hookBeforeMethod
+                    }
                     val backupUrls = if (param.args[0] == null) {
                         if (baseUrl.contains("live-bvc")) return@hookBeforeMethod else {
                             emptyList<String>()

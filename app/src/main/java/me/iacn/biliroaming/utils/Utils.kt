@@ -414,6 +414,10 @@ inline fun Any.mossResponseHandlerReplaceProxy(crossinline onNext: (reply: Any?)
             }
             m(this, *args)
         } else if (m.name == "onError") {
+            val error = args?.firstOrNull()
+            if (instance.networkExceptionClass?.isInstance(error) == true) {
+                return@newProxyInstance if (args == null) m(this) else m(this, *args)
+            }
             val newResponse = onNext(null)
             if (newResponse == null) {
                 m(this, *args)
