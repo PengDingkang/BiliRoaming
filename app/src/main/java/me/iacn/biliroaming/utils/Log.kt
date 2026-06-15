@@ -7,6 +7,7 @@ import android.os.Looper
 import android.widget.Toast
 import de.robv.android.xposed.XposedBridge
 import me.iacn.biliroaming.BiliBiliPackage
+import me.iacn.biliroaming.BuildConfig
 import me.iacn.biliroaming.Constant.TAG
 import android.util.Log as ALog
 
@@ -62,11 +63,13 @@ object Log {
 
     @JvmStatic
     fun d(obj: Any?) {
+        if (!BuildConfig.DEBUG) return
         doLog(ALog::d, obj)
     }
 
     @JvmStatic
     fun i(obj: Any?) {
+        if (!BuildConfig.DEBUG) return
         doLog(ALog::i, obj)
     }
 
@@ -77,6 +80,7 @@ object Log {
 
     @JvmStatic
     fun v(obj: Any?) {
+        if (!BuildConfig.DEBUG) return
         doLog(ALog::v, obj)
     }
 
@@ -87,4 +91,3 @@ object Log {
 
     private const val maxLength = 3000
 }
-

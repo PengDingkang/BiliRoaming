@@ -37,5 +37,14 @@
     public static ** requireNonNull(...);
 }
 
+-assumenosideeffects class me.iacn.biliroaming.utils.Log {
+    public static void d(...);
+    public static void i(...);
+    public static void v(...);
+    public void d(...);
+    public void i(...);
+    public void v(...);
+}
+
 -allowaccessmodification
 -overloadaggressively

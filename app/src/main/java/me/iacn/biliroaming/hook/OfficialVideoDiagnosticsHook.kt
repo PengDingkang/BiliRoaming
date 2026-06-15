@@ -1,6 +1,7 @@
 package me.iacn.biliroaming.hook
 
 import me.iacn.biliroaming.BiliBiliPackage.Companion.instance
+import me.iacn.biliroaming.BuildConfig
 import me.iacn.biliroaming.utils.Log
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.LOG_PREFIX
 import me.iacn.biliroaming.utils.OfficialVideoDiagnosticsHelper.activeSessionUposHost
@@ -36,19 +37,27 @@ class OfficialVideoDiagnosticsHook(classLoader: ClassLoader) : BaseHook(classLoa
         )
         interceptorClass.hookBeforeAllMethods(interceptMethod) { param ->
             val target = activeSessionUposHost() ?: run {
-                logLimited("no_session", "$LOG_PREFIX request skip reason=no_active_session ${sessionDebugSummary()}")
+                logLimited("no_session") {
+                    "$LOG_PREFIX request skip reason=no_active_session ${sessionDebugSummary()}"
+                }
                 return@hookBeforeAllMethods
             }
             val request = param.args[0] ?: run {
-                logLimited("no_request", "$LOG_PREFIX request skip reason=no_request target=$target")
+                logLimited("no_request") {
+                    "$LOG_PREFIX request skip reason=no_request target=$target"
+                }
                 return@hookBeforeAllMethods
             }
             val urlField = instance.urlField() ?: run {
-                logLimited("no_url_field", "$LOG_PREFIX request skip reason=no_url_field target=$target")
+                logLimited("no_url_field") {
+                    "$LOG_PREFIX request skip reason=no_url_field target=$target"
+                }
                 return@hookBeforeAllMethods
             }
             val httpUrl = request.getObjectField(urlField) ?: run {
-                logLimited("no_http_url", "$LOG_PREFIX request skip reason=no_http_url target=$target")
+                logLimited("no_http_url") {
+                    "$LOG_PREFIX request skip reason=no_http_url target=$target"
+                }
                 return@hookBeforeAllMethods
             }
             val url = httpUrl.toString()
@@ -56,7 +65,9 @@ class OfficialVideoDiagnosticsHook(classLoader: ClassLoader) : BaseHook(classLoa
             val replaced = replaceMediaHostInUrl(url, target)
             if (replaced == url) {
                 if (url.looksRelevantForDiagnosticsLog()) {
-                    logLimited("skip:${urlForLog(url)}", "$LOG_PREFIX request $decision")
+                    logLimited("skip:${urlForLog(url)}") {
+                        "$LOG_PREFIX request $decision"
+                    }
                 }
                 return@hookBeforeAllMethods
             }
@@ -64,7 +75,9 @@ class OfficialVideoDiagnosticsHook(classLoader: ClassLoader) : BaseHook(classLoa
                 instance.httpUrlParseMethod(),
                 replaced
             ) ?: run {
-                logLimited("parse_new_url_failed", "$LOG_PREFIX request skip reason=parse_new_url_failed $decision")
+                logLimited("parse_new_url_failed") {
+                    "$LOG_PREFIX request skip reason=parse_new_url_failed $decision"
+                }
                 return@hookBeforeAllMethods
             }
             request.setObjectField(urlField, newHttpUrl)
@@ -80,10 +93,11 @@ class OfficialVideoDiagnosticsHook(classLoader: ClassLoader) : BaseHook(classLoa
                 contains("playurl", true) ||
                 contains("video-diagnostics", true)
 
-    private fun logLimited(key: String, message: String) {
+    private inline fun logLimited(key: String, message: () -> String) {
+        if (!BuildConfig.DEBUG) return
         synchronized(loggedKeys) {
             if (loggedKeys.size >= 80 || !loggedKeys.add(key)) return
         }
-        Log.d(message)
+        Log.d(message())
     }
 }

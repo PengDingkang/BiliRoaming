@@ -197,10 +197,10 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
                     calculateSpeed(bytes, start)
                 }
             } catch (e: Throwable) {
-                Log.w(
+                debugLog {
                     "SpeedTest failed host=$upos target=${url.toString().hostForLog()} " +
                             "status=$responseCode bytes=$bytes error=${e.javaClass.simpleName}: ${e.message}"
-                )
+                }
                 calculateSpeed(bytes, start)
             } finally {
                 connection?.disconnect()
@@ -244,7 +244,7 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
             }
         }
     } catch (e: Throwable) {
-        Log.w("SpeedTest source failed: ${e.javaClass.simpleName}: ${e.message}")
+        debugLog { "SpeedTest source failed: ${e.javaClass.simpleName}: ${e.message}" }
         null
     }
 
@@ -288,10 +288,10 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
                 }
             }
         }
-        Log.w(
+        debugLog {
             "SpeedTest playback cache unusable target=$targetHost count=${urls.size} " +
                     "age=${latest.ageMs}ms source=${latest.source}"
-        )
+        }
         return null
     }
 
@@ -313,7 +313,9 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
         val text = requestText(url, recent.referer) ?: return null
         val json = runCatchingOrNull { JSONObject(text) } ?: return null
         if (json.optInt("code", -1) != 0) {
-            Log.w("SpeedTest web playurl failed code=${json.optInt("code")} message=${json.optString("message")}")
+            debugLog {
+                "SpeedTest web playurl failed code=${json.optInt("code")} message=${json.optString("message")}"
+            }
             return null
         }
         val candidates = collectWebPlayUrlCandidates(json)
@@ -347,12 +349,16 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
             }
             connection.connect()
             if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                Log.w("SpeedTest request failed status=${connection.responseCode} url=${url.hostForLog()}")
+                debugLog {
+                    "SpeedTest request failed status=${connection.responseCode} url=${url.hostForLog()}"
+                }
                 return null
             }
             connection.inputStream.bufferedReader().use { it.readText() }
         } catch (e: Throwable) {
-            Log.w("SpeedTest request failed url=${url.hostForLog()} error=${e.javaClass.simpleName}: ${e.message}")
+            debugLog {
+                "SpeedTest request failed url=${url.hostForLog()} error=${e.javaClass.simpleName}: ${e.message}"
+            }
             null
         } finally {
             connection?.disconnect()
@@ -430,7 +436,9 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
                 return candidate.url
             }
         }
-        Log.w("SpeedTest no usable candidate source=$sourceName target=$targetHost count=${sorted.size}")
+        debugLog {
+            "SpeedTest no usable candidate source=$sourceName target=$targetHost count=${sorted.size}"
+        }
         return null
     }
 
@@ -480,7 +488,9 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
             Log.d("SpeedTest probe $method target=${url.hostForLog()} status=$status")
             status
         } catch (e: Throwable) {
-            Log.w("SpeedTest probe $method failed target=${url.hostForLog()} error=${e.javaClass.simpleName}: ${e.message}")
+            debugLog {
+                "SpeedTest probe $method failed target=${url.hostForLog()} error=${e.javaClass.simpleName}: ${e.message}"
+            }
             -1
         } finally {
             connection?.disconnect()
@@ -566,6 +576,10 @@ class SpeedTestDialog(activity: Activity, private val prefs: SharedPreferences) 
 
     private fun StringBuilder.compactForLog(): String =
         toString().replace(Regex("""\s+"""), " ").take(160)
+
+    private inline fun debugLog(message: () -> String) {
+        if (BuildConfig.DEBUG) Log.d(message())
+    }
 
     private fun HttpURLConnection.applyCookieHeader(url: String, referer: String): Int {
         val cookie = cookieHeader(url, referer) ?: return 0

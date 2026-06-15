@@ -107,11 +107,10 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     fun hook(pageUrl: String, url: String, text: String): String {
         if (!isDiagnosticsPage(pageUrl)) return hook(url, text)
         val target = selectedUposHost() ?: run {
-            logDiagnosticsLimited(
-                "web_no_target",
+            logDiagnosticsLimited("web_no_target") {
                 "$LOG_PREFIX web response skip reason=no_target page=${urlForLog(pageUrl)} " +
                         "url=${urlForLog(url)} session=${sessionDebugSummary()}"
-            )
+            }
             return text
         }
         val replaced = replaceMediaHostInText(text, target)
@@ -121,10 +120,9 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 "$LOG_PREFIX web response replaced url=${url.hostForLog()} target=$target hosts=$hosts"
             )
         } else if (hosts != "none" || url.looksRelevantForDiagnosticsLog()) {
-            logDiagnosticsLimited(
-                "web_response:${urlForLog(url)}:$hosts",
+            logDiagnosticsLimited("web_response:${urlForLog(url)}:$hosts") {
                 "$LOG_PREFIX web response skip url=${urlForLog(url)} target=$target hosts=$hosts len=${text.length}"
-            )
+            }
         }
         return replaced
     }
@@ -132,21 +130,19 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     fun hookRequest(pageUrl: String, url: String): String {
         if (!isDiagnosticsPage(pageUrl)) return url
         val target = selectedUposHost() ?: run {
-            logDiagnosticsLimited(
-                "web_request_no_target",
+            logDiagnosticsLimited("web_request_no_target") {
                 "$LOG_PREFIX web request skip reason=no_target page=${urlForLog(pageUrl)} " +
                         "url=${urlForLog(url)} session=${sessionDebugSummary()}"
-            )
+            }
             return url
         }
         return replaceMediaHostInUrl(url, target).also { replaced ->
             if (replaced != url) {
                 Log.d("$LOG_PREFIX web request replaced ${url.hostForLog()} -> $target original=${urlForLog(url)}")
             } else if (url.looksRelevantForDiagnosticsLog()) {
-                logDiagnosticsLimited(
-                    "web_request:${urlForLog(url)}",
+                logDiagnosticsLimited("web_request:${urlForLog(url)}") {
                     "$LOG_PREFIX web request ${describeUrlDecision(url, target)}"
-                )
+                }
             }
         }
     }
@@ -159,11 +155,12 @@ class WebViewHook(classLoader: ClassLoader) : BaseHook(classLoader) {
                 contains("playurl", true) ||
                 contains("video-diagnostics", true)
 
-    private fun logDiagnosticsLimited(key: String, message: String) {
+    private inline fun logDiagnosticsLimited(key: String, message: () -> String) {
+        if (!BuildConfig.DEBUG) return
         synchronized(diagnosticsLogs) {
             if (diagnosticsLogs.size >= 80 || !diagnosticsLogs.add(key)) return
         }
-        Log.d(message)
+        Log.d(message())
     }
 
     override fun lateInitHook() {
