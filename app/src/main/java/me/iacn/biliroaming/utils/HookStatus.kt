@@ -76,6 +76,7 @@ object HookStatus {
         "LongPressSpeed" to setOf("long_press_speed"),
         "PlayerLongPressHook" to setOf("forbid_player_long_click_accelerate"),
         "MiniPlayerAutoStopHook" to setOf("disable_mini_player_auto_play_next"),
+        "HdMultiPageHook" to setOf("fix_hd_multi_page"),
         "StoryPlayerAdHook" to setOf("purify_story_video_ad"),
     )
 
@@ -211,6 +212,10 @@ object HookStatus {
                     "MiniPlayerAutoPlay" in text ||
                     "mini.player" in text ->
                 setOf("disable_mini_player_auto_play_next")
+
+            "VideoDetailPlayer#a" in text ||
+                    "VideosPlayDirectorService#R1" in text ->
+                setOf("fix_hd_multi_page")
 
             "vipQualityTrialService" in text || "canTrial" in text ->
                 setOf("disable_try_watch_vip_quality")

@@ -82,6 +82,7 @@ class XposedInit : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     if (BuildConfig.DEBUG) {
                         startHook { SSLHook(lpparam.classLoader) }
                     }
+                    startHook { HdMultiPageHook(lpparam.classLoader) }
                     startHook { KillDelayBootHook(lpparam.classLoader) }
                     startHook { HintHook(lpparam.classLoader) }
                     startHook { BangumiSeasonHook(lpparam.classLoader) }

@@ -216,6 +216,12 @@
             android:title="@string/disable_mini_player_auto_play_next_title" />
 
         <SwitchPreference
+            android:defaultValue="true"
+            android:key="fix_hd_multi_page"
+            android:summary="@string/fix_hd_multi_page_summary"
+            android:title="@string/fix_hd_multi_page_title" />
+
+        <SwitchPreference
             android:key="disable_live_room_double_click"
             android:summary="@string/disable_live_room_double_click_summary"
             android:title="@string/disable_live_room_double_click_title" />
