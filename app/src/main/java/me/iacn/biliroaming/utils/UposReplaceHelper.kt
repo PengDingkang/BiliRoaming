@@ -8,6 +8,7 @@ import me.iacn.biliroaming.BuildConfig
 import me.iacn.biliroaming.BiliBiliPackage.Companion.instance
 import me.iacn.biliroaming.UGCPlayViewReply
 import me.iacn.biliroaming.XposedInit
+import java.net.InetAddress
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -29,10 +30,12 @@ object UposReplaceHelper {
     private val mainVideoUpos =
         sPrefs.getString("upos_host", null) ?: if (isLocatedCn) hwHost else aliovHost
     private val extraVideoUposList = CdnHostRepository.backupHostsFor(mainVideoUpos, isLocatedCn)
-    private val videoUposBase by lazy {
+    private fun videoUposBase(): String {
         runCatchingOrNull { videoUposList.get(500L, TimeUnit.MILLISECONDS) }?.get(0)
-            ?: mainVideoUpos
+            ?.let { return it }
+        return fallbackVideoUposBase()
     }
+
     val videoUposBackups by lazy {
         runCatchingOrNull {
             videoUposList.get(500L, TimeUnit.MILLISECONDS).drop(1).take(2)
@@ -47,7 +50,6 @@ object UposReplaceHelper {
     private val overseaVideoUposRegex by lazy {
         Regex("""(akamai|(ali|hw|cos)\w*ov|hk-eq|bstar|--ov-gotcha)""", RegexOption.IGNORE_CASE)
     }
-    private val urlBwRegex by lazy { Regex("""(bw=[^&]*)""") }
     private val ipPCdnRegex by lazy { Regex("""^https?://\d{1,3}\.\d{1,3}""") }
     private val pcdnHostRegex by lazy {
         Regex("""(szbdyd\.com|\.mcdn\.bilivideo|\.mcdn\.biliapi|pcdn)""", RegexOption.IGNORE_CASE)
@@ -63,6 +65,7 @@ object UposReplaceHelper {
 
     fun debugConfigSummary(): String =
         "enabled=$enableUposReplace main=$mainVideoUpos locatedCn=$isLocatedCn " +
+                "replacement=${selectedVideoUpos()} " +
                 "force=$forceUpos blockPcdn=$enablePcdnBlock blockLivePcdn=$enableLivePcdnBlock " +
                 "fallbacks=${extraVideoUposList.joinToString()}"
 
@@ -81,7 +84,7 @@ object UposReplaceHelper {
         contains(ipPCdnRegex) -> "skip_ip_pcdn"
         forceUpos && startsWith("http") -> "force_upos"
         enablePcdnBlock && isPCdnUpos() -> "block_pcdn"
-        isOverseaUpos() -> "oversea"
+        enableUposReplace && isOverseaUpos() -> "oversea"
         else -> "not_needed"
     }
 
@@ -89,7 +92,8 @@ object UposReplaceHelper {
         logUposDebug { "initVideoUposList ${debugConfigSummary()}" }
         videoUposList = MainScope().future(Dispatchers.IO) {
             val bCacheRegex = Regex("""cn-.*\.bilivideo""")
-            mutableListOf(mainVideoUpos).apply {
+            val playableMainUpos = resolvePlayableMainVideoUpos()
+            mutableListOf(playableMainUpos).apply {
                 // 8K video sample, without area limitation, reply probably contains Mirror CDN
                 val playViewReply = instance.playViewReqClass?.new()?.apply {
                     callMethod("setAid", 355749246L)
@@ -120,7 +124,9 @@ object UposReplaceHelper {
                 logUposDebug {
                     "official candidates count=${officialList.size} hosts=${officialList.take(8)}"
                 }
-                addAll(officialList.filter { !(it.contains(bCacheRegex) || it == mainVideoUpos) }
+                addAll(officialList.filter {
+                    !(it.contains(bCacheRegex) || it == mainVideoUpos || it == playableMainUpos)
+                }
                     .ifEmpty { officialList })
                 addAll(extraVideoUposList)
             }.also { hosts ->
@@ -148,7 +154,7 @@ object UposReplaceHelper {
             // only 'szbdyd.com' like PCDN can be replace
             (forceUpos && startsWith("http")) ||
                     (enablePcdnBlock && isPCdnUpos()) ||
-                    isOverseaUpos()
+                    (enableUposReplace && isOverseaUpos())
         }
 
     fun String.isLocalPlaybackUrl(): Boolean {
@@ -161,19 +167,17 @@ object UposReplaceHelper {
     }
 
     fun String.replaceUpos(
-        upos: String = videoUposBase, needReplace: Boolean = true
+        upos: String = videoUposBase(), needReplace: Boolean = true
     ): String {
-        fun String.replaceUposBw(): String = replace(urlBwRegex, "bw=1280000")
-
         return if (needReplace) {
             val uri = Uri.parse(this)
             val newUpos = uri.getQueryParameter("xy_usource") ?: upos
-            uri.replaceUpos(newUpos).toString().replaceUposBw().also { result ->
+            uri.replaceUpos(newUpos).toString().also { result ->
                 logUposDebug {
                     "replaceUpos need=true from=${hostForLog()} target=$newUpos result=${result.hostForLog()}"
                 }
             }
-        } else replaceUposBw().also { result ->
+        } else this.also { result ->
             logUposDebug {
                 "replaceUpos need=false from=${hostForLog()} result=${result.hostForLog()}"
             }
@@ -193,17 +197,43 @@ object UposReplaceHelper {
 
     private fun hookTf(mClassLoader: ClassLoader) {
         if (!(enablePcdnBlock || forceUpos)) return
-        // fake grpc TF header then only reply with mirror type playurl
-        "com.bilibili.lib.moss.utils.RuntimeHelper".from(mClassLoader)
-            ?.hookAfterMethod("tf") { param ->
-                if (skipTfOverride.get() == true) return@hookAfterMethod
-                val result = param.result
-                if (result.callMethodOrNullAs<Int>("getNumber") != 0) return@hookAfterMethod
-                result.javaClass.callStaticMethodOrNull("forNumber", 1)?.let {
-                    logUposDebug { "tf header overridden to mirror mode" }
-                    param.result = it
-                }
-            }
+        logUposDebug { "tf header override skipped; rely on media asset URL replacement" }
     }
+
+    private fun selectedVideoUpos(): String =
+        if (mainVideoUpos == CdnHostRepository.DEFAULT_HOST) {
+            if (isLocatedCn) hwHost else aliovHost
+        } else {
+            mainVideoUpos
+        }
+
+    private fun resolvePlayableMainVideoUpos(): String {
+        val selectedUpos = selectedVideoUpos()
+        if (!selectedUpos.isDirectCdnCandidate()) return selectedUpos
+        if (selectedUpos.isResolvableHost()) return selectedUpos
+        val fallback = extraVideoUposList.firstOrNull { it.isResolvableHost() }
+            ?: fallbackVideoUposBase()
+        Log.w("$LOG_PREFIX: selected UPOS host unresolved host=$selectedUpos fallback=$fallback")
+        return fallback
+    }
+
+    private fun fallbackVideoUposBase(): String =
+        selectedVideoUpos().let { selectedUpos ->
+            if (selectedUpos.isDirectCdnCandidate()) {
+                if (isLocatedCn) CdnHostRepository.TF_HW_HOST else aliovHost
+            } else {
+                selectedUpos
+            }
+        }
+
+    private fun String.isDirectCdnCandidate(): Boolean =
+        startsWith("cn-", ignoreCase = true) ||
+                contains("--cn-gotcha", ignoreCase = true) ||
+                contains("--ov-gotcha", ignoreCase = true)
+
+    private fun String.isResolvableHost(): Boolean =
+        runCatching {
+            InetAddress.getAllByName(this).isNotEmpty()
+        }.getOrDefault(false)
 
 }

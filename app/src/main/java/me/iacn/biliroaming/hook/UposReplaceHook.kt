@@ -30,7 +30,7 @@ import me.iacn.biliroaming.utils.setObjectField
 
 class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
     override fun startHook() {
-        if (!enableUposReplace || !(forceUpos || enablePcdnBlock || enableLivePcdnBlock)) {
+        if (!(forceUpos || enablePcdnBlock || enableLivePcdnBlock)) {
             logUposDebug { "startHook skipped ${debugConfigSummary()}" }
             return
         }
@@ -128,7 +128,10 @@ class UposReplaceHook(classLoader: ClassLoader) : BaseHook(classLoader) {
             if (backupUrls.isNotEmpty()) {
                 val newBaseUrl = rawUrl.replaceUpos()
                 mediaAssertSegment?.setObjectField("url", newBaseUrl)
-                listOf(rawUrl.replaceUpos(videoUposBackups[0], rawUrl.isOverseaUpos()), baseUrl)
+                listOf(
+                    rawUrl.replaceUpos(videoUposBackups[0]),
+                    rawUrl.replaceUpos(videoUposBackups[1])
+                )
                     .also {
                         logUposDebug {
                             "reconstructBackup basePcdn from=${baseUrl.hostForLog()} " +
