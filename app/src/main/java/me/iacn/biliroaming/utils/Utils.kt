@@ -450,7 +450,14 @@ fun Context.inflateLayout(
     @LayoutRes resource: Int,
     root: ViewGroup? = null,
     attachToRoot: Boolean = root != null
-): View = LayoutInflater.from(this).inflate(resource, root, attachToRoot)
+): View {
+    val inflater = LayoutInflater.from(this)
+    return try {
+        inflater.inflate(resource, root, attachToRoot)
+    } catch (e: android.content.res.Resources.NotFoundException) {
+        inflater.inflate(XposedInit.moduleRes.getLayout(resource), root, attachToRoot)
+    }
+}
 
 fun Context.addModuleAssets() {
     resources.assets.callMethod("addAssetPath", XposedInit.modulePath)
